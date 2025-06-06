@@ -23,13 +23,13 @@ npm install node-ssh-deploy
 
 ```json
 {
-  "outDir": "dist",
+  "outDir": "",
   "dest": {
-    "host": "172.16.34.132",
-    "port": "22",
-    "username": "root",
-    "password": "123@qwe",
-    "path": "/home/application/testDeploy"
+    "host": "",
+    "port": "",
+    "username": "",
+    "password": "",
+    "path": ""
   }
 }
 ```
