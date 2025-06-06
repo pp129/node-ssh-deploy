@@ -6,6 +6,6 @@
     "username": "username",
     "password": "password",
     "path": "/path/to/your/project",
-    "privateKey": "path/to/privateKey"
+    "privateKey": "/path/to/privateKey"
   }
 }
