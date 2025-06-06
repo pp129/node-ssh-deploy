@@ -6,7 +6,7 @@ interface IDest {
   /**
    * 端口一般默认22
    */
-  port: number;
+  port: number | string;
   /**
    * 服务器用户名
    */
@@ -14,11 +14,15 @@ interface IDest {
   /**
    * 服务器连接密码
    */
-  password: string;
+  password?: string;
   /**
    * 上传到服务器的位置
    */
   path: string;
+  /**
+   * 服务器连接密钥
+   */
+  privateKey?: string;
 }
 
 export interface IServer {

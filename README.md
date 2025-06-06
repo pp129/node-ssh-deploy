@@ -29,7 +29,8 @@ npm install node-ssh-deploy
     "port": "22",
     "username": "username",
     "password": "password",
-    "path": "/path/to/your/project"
+    "path": "/path/to/your/project",
+    "privateKey": "path/to/privateKey"
   }
 }
 ```
@@ -41,6 +42,7 @@ npm install node-ssh-deploy
   - `username`：远程服务器用户名。
   - `password`：远程服务器密码。
   - `path`：远程服务器部署路径。
+  - `privateKey`：远程服务器私钥路径。
 
 ### 运行
 

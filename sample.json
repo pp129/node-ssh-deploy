@@ -1,10 +1,11 @@
 {
-  "outputDir": "",
+  "outputDir": "dist",
   "dest": {
-    "host": "",
-    "port": "",
-    "username": "",
-    "password": "",
-    "path": ""
+    "host": "123.45.67.89",
+    "port": "22",
+    "username": "username",
+    "password": "password",
+    "path": "/path/to/your/project",
+    "privateKey": "path/to/privateKey"
   }
 }

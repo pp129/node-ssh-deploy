@@ -4,7 +4,6 @@ import * as winston from "winston";
 import * as yargs from "yargs";
 import * as ora from "ora";
 import * as path from "path";
-import * as ping from "ping";
 import { Client } from "ssh2";
 import type { IServer } from "./interfaces/server";
 
@@ -41,7 +40,7 @@ const spinner = {
  */
 async function zip(url, filename, cb) {
   // init
-  const output = fs.createWriteStream(filename); //创建数据流
+  const output = fs.createWriteStream(`${filename}.zip`); //创建数据流
   output.on("close", () => cb("finish")); //创建完成
   // zip
   const archive = archiver("zip", { zlib: { level: 9 } }); //设置压缩格式和等级
@@ -64,9 +63,11 @@ const conn = new Client();
  */
 function execFn(c = conn) {
   return (command) => {
+    console.log(command);
     return new Promise((resolve, reject) => {
       c.exec(command, (err, stream) => {
         if (err) {
+          console.log(err);
           reject(err);
           return;
         }
@@ -90,7 +91,7 @@ function putFile(sftp, exec, path, file, outputDir) {
     spinner.deploy.stop();
     console.log("✅ 已上传");
 
-    // * 解压
+    // 解压
     spinner.unzip.start();
     await exec(
       `cd ${path} && unzip -o -q ${outputDir}.zip && rm -rf ${outputDir}.zip`
@@ -130,15 +131,15 @@ function checkJsonFile(jsonFile: IServer) {
   if (!jsonFile.dest) {
     throw new Error("请配置服务器信息");
   } else {
-    const { host, username, password, path } = jsonFile.dest;
+    const { host, username, password, privateKey, path } = jsonFile.dest;
     if (!host) {
       throw new Error("请配置服务器host");
     }
     if (!username) {
       throw new Error("请配置服务器username");
     }
-    if (!password) {
-      throw new Error("请配置服务器password");
+    if (!password && !privateKey) {
+      throw new Error("请配置服务器password或密钥");
     }
     if (!path) {
       throw new Error("请配置服务器path");
@@ -152,80 +153,61 @@ async function app() {
   const outputDir = jsonFile.outputDir ?? "dist";
   const dest = jsonFile.dest;
 
-  // 网络监测
-  spinner.network.start();
+  // 开始压缩
+  spinner.zip.start();
 
-  ping.promise
-    .probe(dest.host)
-    .then(async (pingResult) => {
-      spinner.network.stop();
-      if (pingResult.alive) {
-        console.log(`✅ ${dest.host}:${dest.port ?? 22}连接正常`);
-        // 开始压缩
-        spinner.zip.start();
-        const localFile = getFilePath(`${outputDir}.zip`);
-        zip(getFilePath(outputDir), `${outputDir}.zip`, () => {
-          spinner.zip.stop();
-          console.log(`✅ 已压缩至 ${localFile}`);
-        }).then(() => {
-          const { host, port, username, password, path } = dest;
-          spinner.connect.start();
-          conn
-            .on("ready", async function () {
-              spinner.connect.stop();
-              console.log(`✅ 已连接${host}:${port ?? 22}`);
-              const exec = execFn(conn);
+  zip(getFilePath(outputDir), outputDir, () => {
+    spinner.zip.stop();
+    console.log(`✅ 已压缩`);
+  }).then(() => {
+    const localFile = getFilePath(`${outputDir}.zip`);
+    console.log(localFile);
+    const { host, port, username, password, path, privateKey } = dest;
+    spinner.connect.start();
+    conn
+      .on("ready", async function () {
+        spinner.connect.stop();
+        console.log(`✅ 已连接${host}:${port ?? 22}`);
+        const exec = execFn(conn);
 
-              // 删除旧文件夹
-              spinner.remove.start();
-              await exec(`rm -rf ${path}/${outputDir}_*`);
-              spinner.remove.stop();
-              console.log("✅ 已删除旧备份");
+        // 删除旧文件夹
+        spinner.remove.start();
+        await exec(`rm -rf ${path}/${outputDir}_*`);
+        spinner.remove.stop();
+        console.log("✅ 已删除旧备份");
 
-              // 服务器dist文件夹备份
-              const backup = `${path}/${outputDir}_${date}`;
-              spinner.copy.start();
-              await exec(`mv ${path}/${outputDir} ${backup}`);
-              spinner.copy.stop();
-              console.log(`✅ 已备份至${backup}`);
+        // 服务器dist文件夹备份
+        const backup = `${path}/${outputDir}_${date}`;
+        spinner.copy.start();
+        await exec(`mv ${path}/${outputDir} ${backup}`);
+        spinner.copy.stop();
+        console.log(`✅ 已备份至${backup}`);
 
-              // 上传新zip文件
-              spinner.deploy.start();
-              conn.sftp(function (err, sftp) {
+        // 上传新zip文件
+        spinner.deploy.start();
+        conn.sftp(function (err, sftp) {
+          if (err) throw err;
+
+          // linux 是否存在目录${path}，没有就创建
+          sftp.exists(path, (exists) => {
+            if (!exists) {
+              sftp.mkdir(path, function (err) {
                 if (err) throw err;
-
-                // linux 是否存在目录${path}，没有就创建
-                sftp.exists(path, (exists) => {
-                  if (!exists) {
-                    sftp.mkdir(path, function (err) {
-                      if (err) throw err;
-                      console.log(`✅ 已创建目录${path}`);
-                      putFile(sftp, exec, path, localFile, outputDir);
-                    });
-                  } else {
-                    putFile(sftp, exec, path, localFile, outputDir);
-                  }
-                });
+                console.log(`✅ 已创建目录${path}`);
+                putFile(sftp, exec, path, localFile, outputDir);
               });
-            })
-            .connect({
-              host,
-              port: port ?? 22,
-              username,
-              password,
-              // privateKey: '' // 使用密钥登录
-            }); // 连接服务器
+            } else {
+              putFile(sftp, exec, path, localFile, outputDir);
+            }
+          });
         });
-      } else {
-        console.log(
-          `❎ ${dest.host}:${dest.port ?? 22}连接失败，请检查网络或vpn`
-        );
-      }
-    })
-    .catch(() => {
-      spinner.network.stop();
-      console.log(
-        `❎ ${dest.host}:${dest.port ?? 22}连接失败，请检查网络或vpn`
-      );
-    });
+      })
+      .connect({
+        host,
+        port: port ?? 22,
+        username,
+        password,
+        privateKey: privateKey ? fs.readFileSync(privateKey) : "", // 使用密钥登录
+      }); // 连接服务器
+  });
 }
