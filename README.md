@@ -23,18 +23,18 @@ npm install node-ssh-deploy
 
 ```json
 {
-  "outDir": "",
+  "outputDir": "dist",
   "dest": {
-    "host": "",
-    "port": "",
-    "username": "",
-    "password": "",
-    "path": ""
+    "host": "123.45.67.89",
+    "port": "22",
+    "username": "username",
+    "password": "password",
+    "path": "/path/to/your/project"
   }
 }
 ```
 
-- `outDir`：本地项目打包后的目录，默认为 `dist`。
+- `outputDir`：本地项目打包后的目录，默认为 `dist`。
 - `dest`：远程服务器的配置信息。
   - `host`：远程服务器地址。
   - `port`：远程服务器端口，默认为 `22`。
